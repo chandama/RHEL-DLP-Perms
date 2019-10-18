@@ -1,2 +1,2 @@
 # RHEL-DLP-Perms
-Bash script to check and fix missing/wrong perms in Symantec DLP 15.1+ 
+Various bash and SQL scripts for various troubleshooting purposes in SymantecDLP 15.x+
