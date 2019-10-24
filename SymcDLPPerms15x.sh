@@ -1,21 +1,6 @@
 #!/bin/bash
 
 
-#TODO
-#When thinking about modifying perms and ownership, realize that DLP is installed /opt /var and /spool
-#So all perms must be changed simultaneously or there can be issues.
-
-########################################################################
-#                       Jason's Comments:
-# Set default paths as variables at the top, so its easy to quickly change (/opt, /var, /spool)
-# Query service or file for a user, set that as the default user, then prompt the user to enter
-#       the protect usernamed or hit enter to use the username automatically identified.
-# Set default behavior to simply record bad areas, give option to make changes (via uncommenting code).
-########################################################################
-
-
-#Default Path Values
-
 # Using file paths.txt to store output of 'find' which prints all perms in octal and rwx format
 # Then running egrep on the paths.txt file to filter via RegEx and filtering output >> permissions.txt
 print_write_func(){
@@ -43,48 +28,45 @@ print_non_std_perms(){
 
 modify_perms(){
         declare -a permArray
-        #Use sed to remove spaces but keep tab separators in paths.txt
-        #Use grep with pattern or possibly cat and then grep later to identify suspect files.
-        permArray=(`grep -v '644\|755\|750' paths.txt | sed 's/ //g'`)
         declare -i ELEMENTS
+
+        permArray=(`grep -v '644\|755\|750' paths.txt | sed 's/ //g'`)
         ELEMENTS="${#permArray[@]}"
+
         for ((i=0;i<ELEMENTS;i=i+5)) {
                 echo "Element [$i]: ${permArray[$i]} : ${permArray[$i+1]} : ${permArray[$i+4]}"
                 #Check first letter of extended rwx perms to determine if file is symlink, dir, or file
                 #Directories
-
-                #Need to edit the path element $i+4 to contain space if in 15.1 for chmod to run
-                #If script is goign to run on all 15.x versions, you need to check for 15.1 in the path
-                # and then modify 'EnforceServer' to 'Enforce\ Server' or leave it
-                # Check MOD_PATH for 15.5 or 15.1 and only add space if 15.1 is found in MOD_PATH
                 MOD_PATH=${permArray[$i+4]}
+                if [[ ${permArray[$i+4]} == *"15.1"* ]]; then
+                        MOD_PATH=${MOD_PATH/EnforceServer/Enforce Server}
+                fi
                 if [[ ${permArray[$i+1]} == d* ]]; then
-                        echo "Modifying dir permissions: ${permArray[$i+4]}"
-                        chmod 755 MOD_PATH
-                #Files
+                        echo "Modifying dir permissions: $MOD_PATH"
+                        chmod 755 "$MOD_PATH"
                 #Need extra perms to determine if file is secure file that needs 644 rather than 750
                 elif [[ ${permArray[$i+1]} == -* ]] && [[ ${permArray[$i+4]} != *.key || ${permArray[$i+4]} != *.sslKeyStore ]]; then
-                        echo "Modifying file permissions: ${permArray[$i+4]}"
-                        chmod 750 MOD_PATH
-                #sslKaystore, .key, and other security files require 644 permissions.
+                        echo "Modifying file permissions: $MOD_PATH"
+                        chmod 750 "$MOD_PATH"
+                #sslKeystore, .key, and other security files require 644 permissions.
                 elif [[ ${permArray[$i+1]} == -* ]] && [[ ${permArray[$i+4]} == *.key || ${permArray[$i+4]} == *.sslKeyStore ]]; then
-                        echo "Modifying security file permissions: ${permArray[$i+4]}"
-                        chmod 644 MOD_PATH
+                        echo "Modifying security file permissions: $MOD_PATH"
+                        chmod 644 "$MOD_PATH"
                 else
-                        echo "File type undetermined : ${permArray[$i+4]}"
+                        echo "Unable to determine file type : $MOD_PATH"
                 fi
         }
 }
 
-#Call Functions
+#Function Calls
 print_write_func "$1"
 print_non_std_perms
-echo "Modify non standard perms?"
+echo -n "Modify non standard perms? [y]es [n]o"
 read PERM_CALL
 
-if [[ $PERM_CALL == 1 ]]; then
+if [[ $PERM_CALL == y ]]; then
         modify_perms
-elif [[ $PERM_CALL != 1 ]]; then
+elif [[ $PERM_CALL != y ]]; then
         echo "No modifications made"
 else
         echo "Invalid entry"
